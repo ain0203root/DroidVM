@@ -56,7 +56,8 @@ public final class DaemonClient {
     }
 
     public void connect(int port) throws IOException {
-        var addr = InetAddress.getLocalHost();
+        // Keep the client endpoint identical to Server.run(): daemon IPC is local-only.
+        var addr = InetAddress.getByName("127.0.0.1");
         var sockAddr = new InetSocketAddress(addr, port);
         socket = new Socket();
         socket.connect(sockAddr);

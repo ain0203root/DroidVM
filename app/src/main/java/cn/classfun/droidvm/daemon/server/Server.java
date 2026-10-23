@@ -99,7 +99,9 @@ public final class Server {
         ServerSocket serverSocket;
         InetSocketAddress sockAddr;
         try {
-            var addr = InetAddress.getLocalHost();
+            // Port availability is checked on 127.0.0.1; bind on that exact
+            // address too. The daemon IPC is local to this Android device.
+            var addr = InetAddress.getByName("127.0.0.1");
             var port = generateRandomAvailablePort();
             if (port < 0) {
                 Log.e(TAG, "Failed to find an available port");
@@ -110,7 +112,10 @@ public final class Server {
             serverSocket.setReuseAddress(true);
             serverSocket.bind(sockAddr);
         } catch (Exception e) {
-            Log.e(TAG, "Failed to start server socket", e);
+            Log.e(TAG, fmt(
+                "Failed to start server socket (%s: %s)",
+                e.getClass().getSimpleName(), String.valueOf(e.getMessage())
+            ), e);
             return;
         }
         writePortFile(sockAddr.getPort());

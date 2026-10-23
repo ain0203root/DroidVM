@@ -22,7 +22,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       DROIDVM_PREBUILT_COMPRESSION_LEVEL: "9"
-      HAS_SIGN_KEY: ${{ secrets.APP_SIGN_KEY_JKS != '' }}
 
     steps:
       - name: Checkout repository
@@ -48,34 +47,9 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      # With a signing key: build and sign a real release APK (current
-      # behaviour). Without one: ship the debug APK -- signed with the
-      # auto-generated debug keystore -- instead of an unsigned release.
-      - name: Build release APK
-        if: ${{ env.HAS_SIGN_KEY == 'true' }}
-        run: ./gradlew assembleRelease
-
-      - name: Sign release APK
-        if: ${{ env.HAS_SIGN_KEY == 'true' }}
-        env:
-          APP_SIGN_KEY_JKS: ${{ secrets.APP_SIGN_KEY_JKS }}
-          APP_SIGN_KEY_PASS: ${{ secrets.APP_SIGN_KEY_PASS }}
-        run: |
-          BUILD_TOOLS="${ANDROID_HOME}/build-tools/36.0.0"
-          echo "$APP_SIGN_KEY_JKS" | base64 -d > /tmp/keystore.jks
-          UNSIGNED=$(find app/build/outputs/apk/release -name '*.apk' | head -1)
-          ALIGNED="${UNSIGNED%.apk}-aligned.apk"
-          "${BUILD_TOOLS}/zipalign" -f -v 4 "$UNSIGNED" "$ALIGNED"
-          "${BUILD_TOOLS}/apksigner" sign \
-            --ks /tmp/keystore.jks \
-            --ks-pass "pass:${APP_SIGN_KEY_PASS}" \
-            --key-pass "pass:${APP_SIGN_KEY_PASS}" \
-            --out "$UNSIGNED" \
-            "$ALIGNED"
-          rm -f "$ALIGNED" /tmp/keystore.jks
-
-      - name: Build debug APK (no signing key)
-        if: ${{ env.HAS_SIGN_KEY != 'true' }}
+      # This is a rolling DEV prerelease: always publish the debug variant,
+      # even if release-signing secrets happen to be configured in the fork.
+      - name: Build dev APK (debug variant)
         run: ./gradlew assembleDebug
 
       # Derive a version string from the latest real tag, e.g. `0.0.6.r63.52993d4`
@@ -102,11 +76,7 @@ jobs:
           set -euo pipefail
           mkdir -p release
           apk="release/DroidVM-${{ steps.version.outputs.name }}-dev.apk"
-          if [ "${HAS_SIGN_KEY}" = "true" ]; then
-            cp app/build/outputs/apk/release/*.apk "$apk"
-          else
-            cp app/build/outputs/apk/debug/*.apk "$apk"
-          fi
+          cp app/build/outputs/apk/debug/*.apk "$apk"
 
       - name: Publish rolling dev pre-release
         env:
